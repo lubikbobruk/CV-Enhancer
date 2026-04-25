@@ -1,8 +1,7 @@
 """Streamlit interface"""
 
 import streamlit as st
-
-from src.generation.gemini_client import test_call
+from src.parsing import *
 
 st.title("CV Enhancer")
 
@@ -15,8 +14,25 @@ with right:
     job_ad = st.text_area("Job ad", height=300)
 
 if st.button("Enhance"):
+    if cv_file is None:
+        st.warning("Upload a CV first.")
+        st.stop()
+
     try:
-        reply = test_call("Welcome a person to the CV-enhancer project in enthusiastic manner.")
-        st.success(reply)
-    except Exception as exc:
-        st.error(f"Gemini call failed: {exc}")
+        text = extract_text(cv_file, cv_file.name)
+    except ValueError as exc:
+        st.error(str(exc))
+        st.stop()
+
+    if not text:
+        st.warning("Couldn't extract any text from this file. \
+                    If it's a scanned PDF, try a text-based version.")
+        st.stop()
+
+    chunks = chunk(text)
+    st.info(f"Parsed {len(chunks)} chunks from the CV.")
+    with st.expander("Preview chunks"):
+        for i, block in enumerate(chunks):
+            st.markdown(f"**Chunk {i}**")
+            st.text(block)
+
