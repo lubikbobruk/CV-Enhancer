@@ -2,8 +2,9 @@
 
 ## 🚀 Project Roadmap
 
-Phase 0 — Setup: repo, env, deps, hello-world Streamlit + Gemini
-Phase 1 — Parsing: PDF/DOCX → text → chunks
+Phase 0 — Setup: repo, env, deps, hello-world Streamlit + Gemini ✅
+Phase 1 — Parsing: PDF/DOCX → text → chunks ✅
+
 Phase 2 — Classical retrieval: TF-IDF retriever
 Phase 3 — Dense retrieval + fusion: sentence-transformers + RRF
 Phase 4 — LLM generation: prompts, schemas, structured Gemini output
@@ -16,7 +17,7 @@ Phase 8 — Report: write the academic deliverable
 
 Requires [conda](https://docs.conda.io/projects/miniconda/) and a Gemini API key from https://aistudio.google.com/apikey.
 
-1. Create the conda env (installs Python 3.11 and all pip dependencies from `requirements.txt`):
+1. Create the conda env:
    ```
    conda env create -f environment.yml
    ```
@@ -34,7 +35,6 @@ Requires [conda](https://docs.conda.io/projects/miniconda/) and a Gemini API key
    streamlit run app.py
    ```
 
-To update an existing env after `requirements.txt` changes:
-```
-conda env update -f environment.yml --prune
-```
+# Unit testing
+
+Run: python -m pytest tests/
