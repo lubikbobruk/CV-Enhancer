@@ -2,6 +2,7 @@
 
 import streamlit as st
 from src.parsing import *
+from src.retrieval.tfidf_retriever import TfidfRetriever
 
 st.title("CV Enhancer")
 
@@ -35,4 +36,17 @@ if st.button("Enhance"):
         for i, block in enumerate(chunks):
             st.markdown(f"**Chunk {i}**")
             st.text(block)
+
+    if not job_ad.strip():
+        st.info("Paste a job ad to see ranked chunks.")
+        st.stop()
+
+    retriever = TfidfRetriever()
+    retriever.fit(chunks)
+    top = retriever.query(job_ad, k=5)
+
+    with st.expander("Top-k chunks for this job ad (TF-IDF)", expanded=True):
+        for rank, (idx, score) in enumerate(top, start=1):
+            st.markdown(f"**#{rank} — chunk {idx} — score {score:.3f}**")
+            st.text(chunks[idx])
 

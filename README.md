@@ -6,7 +6,7 @@ A Python application that rewrites a candidate's CV to better match a target job
 
 Upload a CV (PDF/DOCX), paste a job ad, click **Enhance**. The app parses and chunks the document, retrieves the most and least relevant sections using **TF-IDF**, **dense embeddings**, and **RRF hybrid fusion**, then feeds everything into **Gemini 2.5 Flash** to rewrite the CV for the target role. The enhanced CV is downloadable as a styled PDF. A feedback panel shows strengths, gaps, and what was changed.
 
-Current status: **In development**: Phase 2
+Current status: **In development**: Phase 3
 
 ## 🔑 API Setup
 
@@ -83,7 +83,7 @@ cv-enhancer/
 
 - **Phase 0 — Setup:** Repo, environment, Streamlit + Gemini hello-world. ✅
 - **Phase 1 — Parsing:** PDF/DOCX → text → chunks. ✅
-- **Phase 2 — Classical Retrieval:** TF-IDF retriever wrapping sklearn.
+- **Phase 2 — Classical Retrieval:** TF-IDF retriever wrapping sklearn. ✅
 - **Phase 3 — Dense Retrieval + Fusion:** sentence-transformers + RRF.
 - **Phase 4 — LLM Generation:** Structured Gemini output (enhanced CV + feedback).
 - **Phase 5 — Streamlit UI:** Full flow — upload, enhance, download PDF.
