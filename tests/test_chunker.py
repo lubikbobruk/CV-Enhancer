@@ -18,7 +18,7 @@ def test_chunker_block_above_target_emits_immediately() -> None:
     long_block = "x" * 500
     text = f"{long_block}\n\nshort tail block that is long enough to survive the filter."
 
-    result = chunk(text, target_chars=400)
+    result = chunk(text, target_chars=400, max_chars=500)
 
     assert len(result) == 2
     assert result[0] == long_block
@@ -61,7 +61,7 @@ def test_chunker_trailing_buffer_below_target_is_still_emitted() -> None:
     tail = "tail block long enough to clear the minimum length filter for chunks."
     text = f"{long_block}\n\n{tail}"
 
-    result = chunk(text, target_chars=400)
+    result = chunk(text, target_chars=400, max_chars=500)
 
     assert len(result) == 2
     assert result[1] == tail
@@ -76,3 +76,23 @@ def test_chunker_merged_blocks_are_separated_by_double_newline() -> None:
 
     assert len(result) == 1
     assert result[0] == f"{block_a}\n\n{block_b}"
+
+
+def test_chunker_oversized_block_is_split_on_single_newlines() -> None:
+    line = "x" * 80
+    big_block = "\n".join([line] * 10)  # 10 lines, ~810 chars total — one block.
+    result = chunk(big_block, min_chars=40, target_chars=200, max_chars=300)
+
+    assert len(result) > 1
+    assert all(len(c) <= 300 for c in result)
+
+
+def test_chunker_pack_stops_before_breaching_max_chars() -> None:
+    block_a = "a" * 300
+    block_b = "b" * 300
+    text = f"{block_a}\n\n{block_b}"
+    result = chunk(text, min_chars=40, target_chars=400, max_chars=500)
+
+    assert len(result) == 2
+    assert result[0] == block_a
+    assert result[1] == block_b
