@@ -2,7 +2,16 @@
 
 import streamlit as st
 from src.parsing import *
+from src.retrieval.embedding_retriever import DenseRetriever, load_minilm
+from src.retrieval.fusion import reciprocal_rank_fusion
 from src.retrieval.tfidf_retriever import TfidfRetriever
+
+
+def _render_ranking(title: str, ranking: list[tuple[int, float]], chunks: list[str]) -> None:
+    st.markdown(f"**{title}**")
+    for rank, (idx, score) in enumerate(ranking, start=1):
+        st.markdown(f"#{rank} — chunk {idx} — score {score:.3f}")
+        st.text(chunks[idx])
 
 st.title("CV Enhancer")
 
@@ -41,12 +50,22 @@ if st.button("Enhance"):
         st.info("Paste a job ad to see ranked chunks.")
         st.stop()
 
-    retriever = TfidfRetriever()
-    retriever.fit(chunks)
-    top = retriever.query(job_ad, k=5)
+    tfidf = TfidfRetriever()
+    tfidf.fit(chunks)
+    tfidf_ranking = tfidf.query(job_ad, k=5)
 
-    with st.expander("Top-k chunks for this job ad (TF-IDF)", expanded=True):
-        for rank, (idx, score) in enumerate(top, start=1):
-            st.markdown(f"**#{rank} — chunk {idx} — score {score:.3f}**")
-            st.text(chunks[idx])
+    with st.spinner("Encoding chunks with MiniLM..."):
+        dense = DenseRetriever(load_minilm())
+        dense.fit(chunks)
+    dense_ranking = dense.query(job_ad, k=5)
+
+    fused_ranking = reciprocal_rank_fusion([tfidf_ranking, dense_ranking], k=5)
+
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        _render_ranking("TF-IDF", tfidf_ranking, chunks)
+    with col_b:
+        _render_ranking("Dense (MiniLM)", dense_ranking, chunks)
+    with col_c:
+        _render_ranking("Fused (RRF)", fused_ranking, chunks)
 
