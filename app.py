@@ -1,78 +1,34 @@
-"""Streamlit interface"""
+"""Streamlit entry point.
+
+Thin dispatcher: initializes session state, injects CSS, renders the
+screen for the current stage. All real work lives in src/ui/*.
+"""
 
 import streamlit as st
-from src.parsing import *
-from src.parsing.job_ad_filter import filter_role_relevant
-from src.retrieval.embedding_retriever import DenseRetriever, load_minilm
-from src.retrieval.fusion import reciprocal_rank_fusion
-from src.retrieval.tfidf_retriever import TfidfRetriever
+
+from src.ui import results, select, state, styles, upload
 
 
-def _render_ranking(title: str, ranking: list[tuple[int, float]], chunks: list[str]) -> None:
-    st.markdown(f"**{title}**")
-    for rank, (idx, score) in enumerate(ranking, start=1):
-        st.markdown(f"#{rank} — chunk {idx} — score {score:.3f}")
-        st.text(chunks[idx])
+st.set_page_config(
+    page_title="CV Enhancer",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+state.init()
+styles.inject()
 
-st.title("CV Enhancer")
 
-left, right = st.columns(2)
+with st.sidebar:
+    st.markdown("### CV Enhancer")
+    st.caption(f"Stage: `{state.current()}`")
+    if st.button("Start over", use_container_width=True):
+        state.reset()
 
-with left:
-    cv_file = st.file_uploader("CV", type=["pdf", "docx"])
 
-with right:
-    job_ad = st.text_area("Job ad", height=300)
+_RENDERERS = {
+    "upload": upload.render,
+    "select": select.render,
+    "results": results.render,
+}
 
-if st.button("Enhance"):
-    if cv_file is None:
-        st.warning("Upload a CV first.")
-        st.stop()
-
-    try:
-        text = extract_text(cv_file, cv_file.name)
-    except ValueError as exc:
-        st.error(str(exc))
-        st.stop()
-
-    if not text:
-        st.warning("Couldn't extract any text from this file. \
-                    If it's a scanned PDF, try a text-based version.")
-        st.stop()
-
-    chunks = chunk_cv(text)
-    st.info(f"Parsed {len(chunks)} chunks from the CV.")
-    with st.expander("Preview chunks"):
-        for i, block in enumerate(chunks):
-            st.markdown(f"**Chunk {i}**")
-            st.text(block)
-
-    if not job_ad.strip():
-        st.info("Paste a job ad to see ranked chunks.")
-        st.stop()
-
-    with st.spinner("Encoding chunks with MiniLM..."):
-        model = load_minilm()
-
-    filtered_ad = filter_role_relevant(job_ad, model=model)
-    with st.expander("Filtered job ad"):
-        st.text(filtered_ad)
-
-    tfidf = TfidfRetriever()
-    tfidf.fit(chunks)
-    tfidf_ranking = tfidf.query(filtered_ad, k=5)
-
-    dense = DenseRetriever(model)
-    dense.fit(chunks)
-    dense_ranking = dense.query(filtered_ad, k=5)
-
-    fused_ranking = reciprocal_rank_fusion([tfidf_ranking, dense_ranking], k=5)
-
-    col_a, col_b, col_c = st.columns(3)
-    with col_a:
-        _render_ranking("TF-IDF", tfidf_ranking, chunks)
-    with col_b:
-        _render_ranking("Dense (MiniLM)", dense_ranking, chunks)
-    with col_c:
-        _render_ranking("Fused (RRF)", fused_ranking, chunks)
-
+_RENDERERS[state.current()]()
