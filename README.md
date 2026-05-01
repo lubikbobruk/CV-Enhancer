@@ -6,7 +6,7 @@ A Python application that rewrites a candidate's CV to better match a target job
 
 Upload a CV (PDF/DOCX), paste a job ad, click **Enhance**. The app parses and chunks the document, retrieves the most and least relevant sections using **TF-IDF**, **dense embeddings**, and **RRF hybrid fusion**, then feeds everything into **Gemini 2.5 Flash** to rewrite the CV for the target role. The enhanced CV is downloadable as a styled PDF. A feedback panel shows strengths, gaps, and what was changed.
 
-Current status: **In development**: Phase 4
+Current status: **In development**: Phase 5
 
 ## 🔑 API Setup
 
@@ -47,8 +47,9 @@ streamlit run app.py
 ### Dev utilities
 
 ```bash
-python -m pytest tests/    # unit tests
-flake8 .                   # pep8 audit
+python -m tests.smoke_phase4        # smoke test for llm enhancer on fixture
+pytest                              # unit tests
+flake8 .                            # pep8 audit
 ```
 
 ## 🗂️ Project Structure
@@ -57,26 +58,14 @@ flake8 .                   # pep8 audit
 cv-enhancer/
 ├── app.py                        # Streamlit entry point
 ├── .env.example                  # API key template
-├── environment.yml               # Conda env
-├── requirements.txt              # Python dependencies
 ├── src/
-│   ├── config.py                 # Env loading, constants
-│   ├── parsing/                  # Parser and Chunker
-│   │   ├── __init__.py           
-│   │   ├── pdf_parser.py
-│   │   ├── docx_parser.py
-│   │   └── chunker.py
-│   ├── retrieval/
-│   └── generation/
-│       ├── gemini_client.py
-│       ├── prompts.py
-│       └── schemas.py           
-├── evaluation/
-│   ├── dataset.py
-│   ├── metrics.py                # P@k, MRR
-│   └── run_eval.py
-├── tests/                        # Unit testing
-└── data/
+│   ├── parsing/                  # PDF/DOCX parsing and chunking
+│   ├── retrieval/                # TF-IDF, dense, RRF fusion
+│   ├── generation/               # Gemini client, prompts, schemas
+│   └── output/                   # PDF writer
+├── evaluation/                   # Precision@k and MRR
+├── tests/                        # Unit tests and fixtures
+└── data/                         # Eval datasets
 ```
 
 ## 🚀 Roadmap
@@ -85,7 +74,7 @@ cv-enhancer/
 - **Phase 1 — Parsing:** PDF/DOCX → text → chunks. ✅
 - **Phase 2 — Classical Retrieval:** TF-IDF retriever wrapping sklearn. ✅
 - **Phase 3 — Dense Retrieval + Fusion:** sentence-transformers + RRF. ✅
-- **Phase 4 — LLM Generation:** Structured Gemini output (enhanced CV + feedback).
+- **Phase 4 — LLM Generation:** Structured Gemini output (enhanced CV + feedback). ✅
 - **Phase 5 — Streamlit UI:** Full flow — upload, enhance, download PDF.
 - **Phase 6 — Evaluation:** Precision@k / MRR on labeled pairs.
 - **Phase 7 — Polish + Deploy:** Demo video, Streamlit Cloud.
