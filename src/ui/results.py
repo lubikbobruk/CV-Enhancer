@@ -27,6 +27,11 @@ def _toggle_accept(chunk_id: int) -> None:
     st.session_state._derived_dirty = True
 
 
+def _toggle_include_photo() -> None:
+    st.session_state.include_photo = not st.session_state.get("include_photo", True)
+    st.session_state._derived_dirty = True
+
+
 def _ensure_results_cache() -> None:
     """Encode originals, job ad, and rewrites once per result. Toggling Accept doesn't re-embed."""
     cache_key = id(st.session_state.result)
@@ -105,7 +110,16 @@ def _refresh_derived() -> None:
         if len(final_embs)
         else 0.0
     )
-    pdf_bytes = build_pdf(original_chunks, overrides=overrides)
+    photo_bytes = (
+        st.session_state.get("photo_bytes")
+        if st.session_state.get("include_photo", True)
+        else None
+    )
+    pdf_bytes = build_pdf(
+        original_chunks,
+        overrides=overrides,
+        photo_bytes=photo_bytes,
+    )
 
     st.session_state._cached_after = after
     st.session_state._cached_pdf = pdf_bytes
@@ -190,6 +204,15 @@ def _render_right_pane() -> None:
 
     st.markdown("")
     st.subheader("Enhanced CV")
+
+    if st.session_state.get("photo_bytes"):
+        st.checkbox(
+            "Include photo",
+            key="include_photo_toggle",
+            value=st.session_state.get("include_photo", True),
+            on_change=_toggle_include_photo,
+            help="Show the largest image found in the source PDF in the header.",
+        )
 
     pdf_bytes = st.session_state._cached_pdf
     b64 = base64.b64encode(pdf_bytes).decode("ascii")

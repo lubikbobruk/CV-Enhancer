@@ -16,6 +16,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     HRFlowable,
+    Image,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -256,7 +257,29 @@ def _render_line(line: str, styles: dict) -> list:
     return [Paragraph(_xml_escape(raw), styles["body"])]
 
 
-def _render_header_block(lines: list[str], styles: dict) -> tuple[list, int]:
+_PHOTO_MAX_SIDE = 3.2 * cm
+
+
+def _build_photo_flowable(photo_bytes: bytes) -> Image | None:
+    """Scale the source image into a `_PHOTO_MAX_SIDE` square bounding box, preserving aspect ratio."""
+    try:
+        img = Image(BytesIO(photo_bytes))
+        ratio = img.imageWidth / img.imageHeight
+        if ratio >= 1:
+            img.drawWidth = _PHOTO_MAX_SIDE
+            img.drawHeight = _PHOTO_MAX_SIDE / ratio
+        else:
+            img.drawHeight = _PHOTO_MAX_SIDE
+            img.drawWidth = _PHOTO_MAX_SIDE * ratio
+        img.hAlign = "RIGHT"
+        return img
+    except Exception:
+        return None
+
+
+def _render_header_block(
+    lines: list[str], styles: dict, photo_bytes: bytes | None = None,
+) -> tuple[list, int]:
     """Render the name + contact preamble. Returns (flowables, lines_consumed)."""
     i = next((k for k, line in enumerate(lines) if line.strip()), len(lines))
     if i >= len(lines):
@@ -266,7 +289,7 @@ def _render_header_block(lines: list[str], styles: dict) -> tuple[list, int]:
     if not _NAME_LINE_RE.match(first) or _CONTACT_HINT_RE.search(first):
         return [], 0
 
-    flow: list = [Paragraph(_xml_escape(first), styles["name"])]
+    text_flow: list = [Paragraph(_xml_escape(first), styles["name"])]
 
     captured = 0
     j = i + 1
@@ -277,9 +300,27 @@ def _render_header_block(lines: list[str], styles: dict) -> tuple[list, int]:
             continue
         if _is_section_label(line) or _split_role_header(line) is not None:
             break
-        flow.append(Paragraph(_xml_escape(line), styles["tagline"]))
+        text_flow.append(Paragraph(_xml_escape(line), styles["tagline"]))
         captured += 1
         j += 1
+
+    photo = _build_photo_flowable(photo_bytes) if photo_bytes else None
+    if photo is not None:
+        header_table = Table(
+            [[text_flow, photo]],
+            colWidths=[None, photo.drawWidth + 0.2 * cm],
+        )
+        header_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (0, 0), "TOP"),
+            ("VALIGN", (1, 0), (1, 0), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        flow: list = [header_table]
+    else:
+        flow = list(text_flow)
 
     flow.append(HRFlowable(
         width="100%", thickness=0.8, color=_RULE, spaceBefore=4, spaceAfter=6,
@@ -287,8 +328,12 @@ def _render_header_block(lines: list[str], styles: dict) -> tuple[list, int]:
     return flow, j
 
 
-def build_pdf(chunks: list[str], overrides: dict[int, str] | None = None) -> bytes:
-    """Render chunks (with overrides applied) to PDF bytes."""
+def build_pdf(
+    chunks: list[str],
+    overrides: dict[int, str] | None = None,
+    photo_bytes: bytes | None = None,
+) -> bytes:
+    """Render chunks (with overrides applied) to PDF bytes. `photo_bytes` floats top-right of the header."""
     _register_fonts()
     overrides = overrides or {}
     styles = _styles()
@@ -303,7 +348,7 @@ def build_pdf(chunks: list[str], overrides: dict[int, str] | None = None) -> byt
         all_lines.extend(_reflow_lines(text.split("\n"), in_header=(idx == 0)))
 
     flow: list = []
-    header_flow, consumed = _render_header_block(all_lines, styles)
+    header_flow, consumed = _render_header_block(all_lines, styles, photo_bytes)
     flow.extend(header_flow)
 
     pending_breaks = [b for b in chunk_breaks if b > consumed]

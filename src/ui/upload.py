@@ -2,8 +2,11 @@
 
 import streamlit as st
 
+from pathlib import Path
+
 from src.parsing import chunk_cv, extract_text
 from src.parsing.job_ad_filter import filter_role_relevant
+from src.parsing.pdf_parser import extract_largest_image
 from src.retrieval.embedding_retriever import DenseRetriever, load_minilm
 from src.retrieval.fusion import reciprocal_rank_fusion
 from src.retrieval.tfidf_retriever import TfidfRetriever
@@ -54,6 +57,13 @@ def render() -> None:
         st.error("Couldn't extract any text. If it's a scanned PDF, try a text-based version.")
         return
 
+    photo_bytes: bytes | None = None
+    if Path(cv_file.name).suffix.lower() == ".pdf":
+        try:
+            photo_bytes = extract_largest_image(cv_file)
+        except Exception:
+            photo_bytes = None
+
     with st.spinner("Parsing, chunking, and ranking against the job ad..."):
         chunks = chunk_cv(cv_text)
         if not chunks:
@@ -77,6 +87,8 @@ def render() -> None:
         dense_scores = {cid: max(0.0, score) for cid, score in dense_ranking}
 
     st.session_state.cv_text = cv_text
+    st.session_state.photo_bytes = photo_bytes
+    st.session_state.include_photo = True
     st.session_state.chunks = chunks
     st.session_state.filtered_ad = filtered_ad
     st.session_state.ranking = ranking
