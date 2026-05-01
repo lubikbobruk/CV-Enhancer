@@ -28,7 +28,7 @@ _SCROLL_HEIGHT = 720  # pixels
 # Toggle to skip live Gemini calls during UI iteration. Returns a canned
 # EnhancementResult with the original text echoed back, so the results
 # screen renders without burning API quota.
-_DISABLE_GEMINI = True
+_DISABLE_GEMINI = False
 
 
 def _stub_result(pairs: list[tuple[int, str]]) -> EnhancementResult:
@@ -103,6 +103,11 @@ def _render_chunk(
     st.button(label, **button_kwargs)
 
 
+def _trigger_enhancement() -> None:
+    """Apply on_click handler — sets a flag the top-level render() will act on."""
+    st.session_state.enhancement_pending = True
+
+
 def _run_enhancement() -> None:
     chunks = st.session_state.chunks
     selected = sorted(st.session_state.selected_ids)
@@ -111,25 +116,26 @@ def _run_enhancement() -> None:
     if _DISABLE_GEMINI:
         result = _stub_result(pairs)
     else:
-        with st.spinner("Rewriting selected chunks with Gemini..."):
-            try:
-                result = enhance_chunks(
-                    full_cv=st.session_state.cv_text,
-                    job_ad=st.session_state.filtered_ad,
-                    selected=pairs,
+        try:
+            result = enhance_chunks(
+                full_cv=st.session_state.cv_text,
+                job_ad=st.session_state.filtered_ad,
+                selected=pairs,
+            )
+        except Exception as exc:
+            st.session_state.enhancement_pending = False
+            if _is_rate_limit(exc):
+                st.error(
+                    "⚠ Gemini rate limit hit (429). "
+                    "Free tier allows ~15 requests/minute — wait a moment and try again."
                 )
-            except Exception as exc:
-                if _is_rate_limit(exc):
-                    st.error(
-                        "⚠ Gemini rate limit hit (429). "
-                        "Free tier allows ~15 requests/minute — wait a moment and try again."
-                    )
-                else:
-                    st.error(f"Gemini call failed: {exc}")
-                return
+            else:
+                st.error(f"Gemini call failed: {exc}")
+            return
 
     st.session_state.result = result
     st.session_state.accepted_ids = {r.chunk_id for r in result.rewrites}
+    st.session_state.enhancement_pending = False
     state.goto("results")
 
 
@@ -175,14 +181,15 @@ def _render_right_pane(right_ranking: list[tuple[int, float]]) -> None:
             st.session_state.selected_ids = set()
             st.rerun()
 
-    if st.button(
+    st.button(
         f"Apply ({selected_count})",
         key="apply",
+        type="primary",
         disabled=selected_count == 0,
         use_container_width=True,
         help="Select at least one chunk to apply." if selected_count == 0 else None,
-    ):
-        _run_enhancement()
+        on_click=_trigger_enhancement,
+    )
 
     with st.container(height=_SCROLL_HEIGHT - 140, border=False):
         if not right_ranking:
@@ -194,10 +201,16 @@ def _render_right_pane(right_ranking: list[tuple[int, float]]) -> None:
 
 
 def render() -> None:
-    back_col, _ = st.columns([3, 8])
-    with back_col:
-        if st.button("← Back to upload", use_container_width=True):
-            state.goto("upload")
+    st.title("Select Chunks")
+
+    if st.session_state.get("enhancement_pending"):
+        with st.spinner("Rewriting selected chunks with Gemini..."):
+            _run_enhancement()
+        st.rerun()
+        return
+
+    if st.button("← Back to upload"):
+        state.goto("upload")
 
     ranking = st.session_state.ranking
     selected = st.session_state.selected_ids

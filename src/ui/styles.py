@@ -28,7 +28,7 @@ _CSS = """
 .fit-neutral { color: #ffcc80; font-weight: 600; }
 .fit-good { color: #66bb6a; font-weight: 600; }
 
-/* All buttons (default): solid bright purple. Includes Enhance and Apply.
+/* All buttons (default): solid bright purple. Includes Enhance.
    Locked to the same color in every state — no hover/focus/active dimming. */
 div.stButton > button,
 div.stButton > button:hover,
@@ -41,7 +41,42 @@ div.stButton > button:active {
     border-radius: 8px;
     font-weight: 600;
     box-shadow: none !important;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+}
+
+/* Apply button (kind="primary" OUTSIDE the scroll container): green.
+   The selected-chunk rule is scoped under stVerticalBlockBorderWrapper,
+   so this top-level [kind="primary"] only matches Apply. */
+div.stButton > button[kind="primary"],
+div.stButton > button[kind="primary"]:focus,
+div.stButton > button[kind="primary"]:focus:not(:active) {
+    background-color: #2d6a3a !important;
+    color: #ffffff !important;
+    border: 1px solid #66bb6a !important;
+    border-radius: 8px;
+    font-weight: 600;
+    box-shadow: none !important;
+    transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+}
+div.stButton > button[kind="primary"]:hover {
+    background-color: #357a44 !important;
+    border-color: #7fd283 !important;
+    color: #ffffff !important;
+}
+div.stButton > button[kind="primary"]:active {
+    background-color: #245530 !important;
+    border-color: #66bb6a !important;
+    color: #ffffff !important;
+    transform: scale(0.99);
+}
+div.stButton > button[kind="primary"] > div,
+div.stButton > button[kind="primary"] > div > p,
+div.stButton > button[kind="primary"]:hover > div,
+div.stButton > button[kind="primary"]:hover > div > p,
+div.stButton > button[kind="primary"]:active > div,
+div.stButton > button[kind="primary"]:active > div > p {
+    color: #ffffff !important;
+    background-color: transparent !important;
 }
 div.stButton > button > div,
 div.stButton > button > div > p,
