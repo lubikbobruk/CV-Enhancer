@@ -1,8 +1,4 @@
-"""Upload screen: CV file + job ad textarea + Enhance button.
-
-Clicking Enhance runs parsing -> chunking -> filtering -> ranking once,
-stores results in session_state, then transitions to the select stage.
-"""
+"""Upload screen. Enhance runs parsing -> chunking -> filtering -> ranking, then transitions to select."""
 
 import streamlit as st
 
@@ -77,9 +73,7 @@ def render() -> None:
         dense_ranking = dense.query(filtered_ad, k=k)
         fused = reciprocal_rank_fusion([tfidf_ranking, dense_ranking], k=k)
 
-        # Least-relevant first per Phase 4 Q2 decision.
         ranking = list(reversed(fused))
-        # Per-chunk dense cosine for the % display (Q4b).
         dense_scores = {cid: max(0.0, score) for cid, score in dense_ranking}
 
     st.session_state.cv_text = cv_text

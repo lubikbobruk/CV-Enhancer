@@ -1,17 +1,4 @@
-"""Select screen: two-pane move-on-click layout.
-
-Left (3/4 width): "CV Chunks" — every chunk not yet selected, ordered
-least-relevant first. Each chunk is itself a full-width button: clicking
-it moves the chunk to the right pane.
-
-Right (1/4 width): "Chunks to enhance" — selected chunks, rendered as
-type="primary" buttons (green outline via CSS). Clicking removes back to
-the left pane. Action buttons sit above the list: Select all, Revert
-all, Apply.
-
-Each pane uses st.container(height=...) so the LIST scrolls independently;
-the pane title sits outside the scroll container and stays put.
-"""
+"""Select screen: click chunks to move them between left (unselected) and right (to-enhance) panes."""
 
 import numpy as np
 import streamlit as st
@@ -27,14 +14,11 @@ _FIT_GOOD = 0.55
 _PREVIEW_LINES = 3
 _SCROLL_HEIGHT = 720  # pixels
 
-# Toggle to skip live Gemini calls during UI iteration. Returns a canned
-# EnhancementResult with the original text echoed back, so the results
-# screen renders without burning API quota.
+# Set True to bypass Gemini during UI iteration; results screen renders with echoed originals.
 _DISABLE_GEMINI = False
 
 
 def _stub_result(pairs: list[tuple[int, str]]) -> EnhancementResult:
-    """Return a canned EnhancementResult for UI testing."""
     return EnhancementResult(
         rewrites=[
             ChunkRewrite(
@@ -48,7 +32,6 @@ def _stub_result(pairs: list[tuple[int, str]]) -> EnhancementResult:
 
 
 def _is_rate_limit(exc: Exception) -> bool:
-    """Best-effort detection of a 429 from langchain/google-genai."""
     msg = str(exc).lower()
     return "429" in msg or "rate limit" in msg or "quota" in msg or "resource_exhausted" in msg
 
@@ -77,7 +60,6 @@ def _remove(chunk_id: int) -> None:
 
 
 def _chunk_button_label(rank: int, score: float, text: str) -> str:
-    """Compose the multiline label rendered inside a chunk button."""
     pct = round(score * 100)
     marker = _fit_marker(score)
     header = f"#{rank}   ·   {pct}% fit   ·   {marker}"
@@ -91,7 +73,6 @@ def _render_chunk(
     text: str,
     side: str,
 ) -> None:
-    """Render one chunk as a full-width clickable button."""
     label = _chunk_button_label(rank, score, text)
     on_click = _add if side == "left" else _remove
     button_kwargs = {
@@ -106,17 +87,11 @@ def _render_chunk(
 
 
 def _trigger_enhancement() -> None:
-    """Apply on_click handler — sets a flag the top-level render() will act on."""
     st.session_state.enhancement_pending = True
 
 
 def _drop_non_improvements(result: EnhancementResult) -> tuple[EnhancementResult, int]:
-    """Filter out rewrites whose dense cosine vs. job ad didn't improve.
-
-    Returns (filtered_result, dropped_count). The same scoring is shown on
-    the results screen, so this guarantees every rewrite the user sees has
-    a strictly positive delta.
-    """
+    """Drop rewrites whose dense cosine vs. job ad didn't improve. Returns (kept, dropped_count)."""
     if not result.rewrites:
         return result, 0
 

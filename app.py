@@ -1,8 +1,4 @@
-"""Streamlit entry point.
-
-Thin dispatcher: initializes session state, injects CSS, renders the
-screen for the current stage. All real work lives in src/ui/*.
-"""
+"""Streamlit entry point. Thin dispatcher; real work lives in src/ui/."""
 
 import streamlit as st
 

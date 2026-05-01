@@ -85,9 +85,9 @@ def chunk_cv(text: str, role_max_chars: int = _DEFAULT_ROLE_MAX_CHARS) -> list[s
 
     chunks: list[str] = []
 
-    preamble = "\n".join(lines[:role_indices[0]]).strip()
-    if preamble:
-        chunks.extend(chunk(preamble))
+    preamble = "\n".join(lines[:role_indices[0]]).rstrip()
+    if preamble.strip():
+        chunks.append(preamble)
 
     for idx, start in enumerate(role_indices):
         if idx + 1 < len(role_indices):

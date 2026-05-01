@@ -1,13 +1,4 @@
-"""Results screen: per-chunk rewrites (left) + aggregate delta + PDF (right).
-
-Left pane: one expander per rewrite, showing original vs rewritten,
-Gemini's reason, an accept/reject toggle, and that chunk's individual
-post-rewrite cosine.
-
-Right pane: the aggregate before -> after similarity card across the full
-CV (originals where not accepted, rewrites where accepted), plus an
-inline PDF preview and download button.
-"""
+"""Results screen: per-chunk rewrites (left), aggregate delta and PDF (right)."""
 
 import base64
 
@@ -20,7 +11,7 @@ from src.ui import state
 
 
 def _toggle_active(chunk_id: int) -> None:
-    """Accordion toggle — clicking the active row collapses it, otherwise opens it."""
+    """Accordion toggle: clicking the active row collapses it, otherwise opens it."""
     if st.session_state.get("active_rewrite") == chunk_id:
         st.session_state.active_rewrite = None
     else:
@@ -28,7 +19,6 @@ def _toggle_active(chunk_id: int) -> None:
 
 
 def _toggle_accept(chunk_id: int) -> None:
-    """Per-rewrite accept toggle. Marks the derived (after, PDF) cache stale."""
     acc = st.session_state.accepted_ids
     if chunk_id in acc:
         acc.discard(chunk_id)
@@ -38,12 +28,7 @@ def _toggle_accept(chunk_id: int) -> None:
 
 
 def _ensure_results_cache() -> None:
-    """One-shot heavy work: per-rewrite scoring + original embeddings + before score.
-
-    These never change — toggling Accept doesn't re-embed anything. Only the
-    aggregate after-score and PDF (rebuilt cheaply from cached embeddings)
-    update on toggle, in _refresh_derived().
-    """
+    """Encode originals, job ad, and rewrites once per result. Toggling Accept doesn't re-embed."""
     cache_key = id(st.session_state.result)
     if st.session_state.get("_results_cache_key") == cache_key:
         return
@@ -97,10 +82,7 @@ def _ensure_results_cache() -> None:
 
 
 def _refresh_derived() -> None:
-    """Recompute aggregate after-score and PDF from cached embeddings.
-
-    Cheap: a few row replacements + a mean + reportlab. No model.encode().
-    """
+    """Recompute after-score and PDF from cached embeddings only — no model.encode()."""
     if not st.session_state.get("_derived_dirty"):
         return
 

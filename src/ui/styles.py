@@ -1,16 +1,4 @@
-"""Custom CSS injection for the UI.
-
-Streamlit's DOM changes between releases. The selectors below are scoped
-narrowly so they don't leak onto unrelated containers. Streamlit is
-pinned in requirements.txt; revalidate selectors if that pin moves.
-
-Strategy: chunk-button styling is scoped to descendants of
-st.container(height=...), which Streamlit marks with the
-data-testid="stVerticalBlockBorderWrapper" wrapper. Action buttons
-(Select all / Revert all / Apply / Enhance) sit OUTSIDE that container
-and use a separate purple style applied via a sibling-of-subheader
-position selector — no fragile <div> wrappers needed.
-"""
+"""Custom CSS injection. Selectors are pinned to Streamlit's current DOM — revalidate if the pin moves."""
 
 import streamlit as st
 
@@ -23,13 +11,7 @@ _CSS = """
     max-width: 1600px;
 }
 
-/* Score badge colors. */
-.fit-bad { color: #ff8a80; font-weight: 600; }
-.fit-neutral { color: #ffcc80; font-weight: 600; }
-.fit-good { color: #66bb6a; font-weight: 600; }
-
-/* All buttons (default): solid bright purple. Includes Enhance.
-   Locked to the same color in every state — no hover/focus/active dimming. */
+/* Default buttons: purple, locked across hover/focus/active. */
 div.stButton > button,
 div.stButton > button:hover,
 div.stButton > button:focus,
@@ -44,9 +26,8 @@ div.stButton > button:active {
     transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
 }
 
-/* Apply button (kind="primary" OUTSIDE the scroll container): green.
-   The selected-chunk rule is scoped under stVerticalBlockBorderWrapper,
-   so this top-level [kind="primary"] only matches Apply. */
+/* Apply button (kind="primary" outside the scroll container): green.
+   Selected-chunk green is scoped under stVerticalBlockBorderWrapper, so this top-level rule only matches Apply. */
 div.stButton > button[kind="primary"],
 div.stButton > button[kind="primary"]:focus,
 div.stButton > button[kind="primary"]:focus:not(:active) {
@@ -68,15 +49,6 @@ div.stButton > button[kind="primary"]:active {
     border-color: #66bb6a !important;
     color: #ffffff !important;
     transform: scale(0.99);
-}
-div.stButton > button[kind="primary"] > div,
-div.stButton > button[kind="primary"] > div > p,
-div.stButton > button[kind="primary"]:hover > div,
-div.stButton > button[kind="primary"]:hover > div > p,
-div.stButton > button[kind="primary"]:active > div,
-div.stButton > button[kind="primary"]:active > div > p {
-    color: #ffffff !important;
-    background-color: transparent !important;
 }
 div.stButton > button > div,
 div.stButton > button > div > p,
@@ -116,8 +88,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] div.stButton > button:not([kind=
     color: #e8e0f0 !important;
     text-align: left !important;
 }
-/* Left-pane chunk hover/active purple flash. Excludes kind="primary"
-   so right-pane (selected) chunks keep their static green look. */
+/* Left-pane chunk hover/active: purple flash. Selected (kind="primary") chunks keep their static green look. */
 div[data-testid="stVerticalBlockBorderWrapper"] div.stButton > button:not([kind="primary"]):hover {
     background-color: #22222e !important;
     border-color: #9d7cd8 !important;
@@ -235,5 +206,4 @@ div[data-testid="stVerticalBlockBorderWrapper"] div.stButton > button[kind="prim
 
 
 def inject() -> None:
-    """Inject the custom CSS. Call once near the top of app.py."""
     st.markdown(_CSS, unsafe_allow_html=True)
