@@ -88,8 +88,9 @@ def render() -> None:
     st.session_state.ranking = ranking
     st.session_state.dense_scores = dense_scores
     st.session_state.selected_ids = set()
-    st.session_state.expanded_ids = set()
     st.session_state.result = None
     st.session_state.accepted_ids = set()
+    st.session_state._results_cache_key = None
+    st.session_state.active_rewrite = None
 
     state.goto("select")

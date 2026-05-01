@@ -19,85 +19,170 @@ from src.retrieval.embedding_retriever import load_minilm
 from src.ui import state
 
 
+def _toggle_active(chunk_id: int) -> None:
+    """Accordion toggle — clicking the active row collapses it, otherwise opens it."""
+    if st.session_state.get("active_rewrite") == chunk_id:
+        st.session_state.active_rewrite = None
+    else:
+        st.session_state.active_rewrite = chunk_id
+
+
 def _toggle_accept(chunk_id: int) -> None:
+    """Per-rewrite accept toggle. Marks the derived (after, PDF) cache stale."""
     acc = st.session_state.accepted_ids
     if chunk_id in acc:
         acc.discard(chunk_id)
     else:
         acc.add(chunk_id)
+    st.session_state._derived_dirty = True
 
 
-def _final_chunks() -> tuple[list[str], dict[int, str]]:
-    """Return (final_chunk_list, overrides_map) honoring accept toggles."""
-    chunks = list(st.session_state.chunks)
+def _ensure_results_cache() -> None:
+    """One-shot heavy work: per-rewrite scoring + original embeddings + before score.
+
+    These never change — toggling Accept doesn't re-embed anything. Only the
+    aggregate after-score and PDF (rebuilt cheaply from cached embeddings)
+    update on toggle, in _refresh_derived().
+    """
+    cache_key = id(st.session_state.result)
+    if st.session_state.get("_results_cache_key") == cache_key:
+        return
+
+    result = st.session_state.result
+    original_chunks = list(st.session_state.chunks)
+    job_ad = st.session_state.filtered_ad
+
+    model = load_minilm()
+    job_emb = model.encode([job_ad], convert_to_numpy=True, normalize_embeddings=True)
+    job_emb = np.asarray(job_emb, dtype=np.float32).reshape(-1)
+    n = np.linalg.norm(job_emb)
+    if n > 0:
+        job_emb = job_emb / n
+
+    original_embs = model.encode(
+        original_chunks, convert_to_numpy=True, normalize_embeddings=True
+    )
+    original_embs = np.asarray(original_embs, dtype=np.float32)
+
+    per_rewrite_score: dict[int, float] = {}
+    rewrite_emb_by_cid: dict[int, np.ndarray] = {}
+    if result.rewrites:
+        rewritten_embs = model.encode(
+            [rw.rewritten_text for rw in result.rewrites],
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+        )
+        rewritten_embs = np.asarray(rewritten_embs, dtype=np.float32)
+        scores = rewritten_embs @ job_emb
+        for rw, s, emb in zip(result.rewrites, scores, rewritten_embs):
+            per_rewrite_score[rw.chunk_id] = float(np.clip(s, 0.0, 1.0))
+            rewrite_emb_by_cid[rw.chunk_id] = emb
+
+    before = (
+        float(np.clip((original_embs @ job_emb).mean(), 0.0, 1.0))
+        if len(original_embs)
+        else 0.0
+    )
+
+    st.session_state._results_cache_key = cache_key
+    st.session_state._cached_per_rewrite = per_rewrite_score
+    st.session_state._cached_original_embs = original_embs
+    st.session_state._cached_rewrite_embs = rewrite_emb_by_cid
+    st.session_state._cached_job_emb = job_emb
+    st.session_state._cached_before = before
+    st.session_state.accepted_ids = {rw.chunk_id for rw in result.rewrites}
+    st.session_state._derived_dirty = True
+    if "active_rewrite" not in st.session_state and result.rewrites:
+        st.session_state.active_rewrite = result.rewrites[0].chunk_id
+
+
+def _refresh_derived() -> None:
+    """Recompute aggregate after-score and PDF from cached embeddings.
+
+    Cheap: a few row replacements + a mean + reportlab. No model.encode().
+    """
+    if not st.session_state.get("_derived_dirty"):
+        return
+
     result = st.session_state.result
     accepted = st.session_state.accepted_ids
+    original_chunks = list(st.session_state.chunks)
+    original_embs = st.session_state._cached_original_embs
+    rewrite_embs = st.session_state._cached_rewrite_embs
+    job_emb = st.session_state._cached_job_emb
+
+    final_embs = original_embs.copy() if len(original_embs) else original_embs
     overrides: dict[int, str] = {}
-    for rewrite in result.rewrites:
-        if rewrite.chunk_id in accepted:
-            chunks[rewrite.chunk_id] = rewrite.rewritten_text
-            overrides[rewrite.chunk_id] = rewrite.rewritten_text
-    return chunks, overrides
+    for rw in result.rewrites:
+        if rw.chunk_id in accepted:
+            final_embs[rw.chunk_id] = rewrite_embs[rw.chunk_id]
+            overrides[rw.chunk_id] = rw.rewritten_text
 
+    after = (
+        float(np.clip((final_embs @ job_emb).mean(), 0.0, 1.0))
+        if len(final_embs)
+        else 0.0
+    )
+    pdf_bytes = build_pdf(original_chunks, overrides=overrides)
 
-def _mean_cosine(chunks: list[str], job_ad: str) -> float:
-    """Mean dense cosine of every chunk against the (filtered) job ad."""
-    model = load_minilm()
-    embeddings = model.encode(chunks, convert_to_numpy=True, normalize_embeddings=True)
-    embeddings = np.asarray(embeddings, dtype=np.float32)
-    q = model.encode([job_ad], convert_to_numpy=True, normalize_embeddings=True)
-    q = np.asarray(q, dtype=np.float32).reshape(-1)
-    norm = np.linalg.norm(q)
-    if norm > 0:
-        q = q / norm
-    scores = embeddings @ q
-    return float(np.clip(scores.mean(), 0.0, 1.0))
+    st.session_state._cached_after = after
+    st.session_state._cached_pdf = pdf_bytes
+    st.session_state._derived_dirty = False
 
 
 def _render_left_pane() -> None:
     st.subheader("Rewrites")
     result = st.session_state.result
     chunks = st.session_state.chunks
-    accepted = st.session_state.accepted_ids
+    dropped = st.session_state.get("dropped_count", 0)
+
+    if dropped:
+        plural = "s" if dropped != 1 else ""
+        st.caption(
+            f"⚠ {dropped} rewrite{plural} didn't improve job-ad fit and "
+            f"{'were' if dropped != 1 else 'was'} dropped."
+        )
 
     if not result.rewrites:
-        st.info("Gemini returned no rewrites.")
+        st.info("No rewrites improved job-ad fit. Try selecting different chunks.")
         return
 
-    model = load_minilm()
-    job_ad = st.session_state.filtered_ad
-    job_emb = model.encode([job_ad], convert_to_numpy=True, normalize_embeddings=True)
-    job_emb = np.asarray(job_emb, dtype=np.float32).reshape(-1)
-    norm = np.linalg.norm(job_emb)
-    if norm > 0:
-        job_emb = job_emb / norm
+    per_rewrite = st.session_state._cached_per_rewrite
+    accepted = st.session_state.accepted_ids
+    active = st.session_state.active_rewrite
 
     for rewrite in result.rewrites:
         cid = rewrite.chunk_id
-        original = chunks[cid]
-        rewritten_emb = model.encode(
-            [rewrite.rewritten_text], convert_to_numpy=True, normalize_embeddings=True
-        )
-        rewritten_emb = np.asarray(rewritten_emb, dtype=np.float32).reshape(-1)
-        new_score = float(np.clip(rewritten_emb @ job_emb, 0.0, 1.0))
+        new_score = per_rewrite[cid]
         old_score = st.session_state.dense_scores.get(cid, 0.0)
         delta = round(new_score * 100) - round(old_score * 100)
         delta_str = f"+{delta}" if delta >= 0 else str(delta)
 
+        is_open = cid == active
+        is_applied = cid in accepted
+        arrow = "▾" if is_open else "▸"
+        applied_tag = "" if is_applied else "  · skipped"
         title = (
-            f"Chunk {cid} · {round(old_score * 100)}% → "
-            f"{round(new_score * 100)}% ({delta_str} pts)"
+            f"{arrow}  Chunk {cid} · {round(old_score * 100)}% → "
+            f"{round(new_score * 100)}% ({delta_str} pts){applied_tag}"
         )
-        with st.expander(title, expanded=True):
+        st.button(
+            title,
+            key=f"hdr_{cid}",
+            on_click=_toggle_active,
+            args=(cid,),
+            use_container_width=True,
+        )
+        if is_open:
             st.checkbox(
-                "Accept this rewrite",
+                "Apply this rewrite to the final CV",
                 key=f"acc_{cid}",
-                value=cid in accepted,
+                value=is_applied,
                 on_change=_toggle_accept,
                 args=(cid,),
             )
             st.markdown("**Original**")
-            st.text(original)
+            st.text(chunks[cid])
             st.markdown("**Rewritten**")
             st.text(rewrite.rewritten_text)
             st.markdown("**Reason**")
@@ -107,16 +192,8 @@ def _render_left_pane() -> None:
 def _render_right_pane() -> None:
     st.subheader("Overall fit")
 
-    final_chunks, overrides = _final_chunks()
-    original_chunks = st.session_state.chunks
-    job_ad = st.session_state.filtered_ad
-
-    with st.spinner("Scoring final CV..."):
-        before = _mean_cosine(original_chunks, job_ad)
-        after = _mean_cosine(final_chunks, job_ad)
-
-    before_pct = round(before * 100)
-    after_pct = round(after * 100)
+    before_pct = round(st.session_state._cached_before * 100)
+    after_pct = round(st.session_state._cached_after * 100)
     st.markdown(
         f"""
         <div class="delta-card">
@@ -132,7 +209,7 @@ def _render_right_pane() -> None:
     st.markdown("")
     st.subheader("Enhanced CV")
 
-    pdf_bytes = build_pdf(original_chunks, overrides=overrides)
+    pdf_bytes = st.session_state._cached_pdf
     b64 = base64.b64encode(pdf_bytes).decode("ascii")
     st.markdown(
         f'<iframe src="data:application/pdf;base64,{b64}" '
@@ -160,6 +237,9 @@ def render() -> None:
     st.title("Enhanced CV")
     if st.button("← Back to selection"):
         state.goto("select")
+
+    _ensure_results_cache()
+    _refresh_derived()
 
     left, right = st.columns(2)
     with left:

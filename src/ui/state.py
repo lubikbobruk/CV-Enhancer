@@ -28,7 +28,8 @@ def init() -> None:
         "selected_ids": set(),
         "expanded_ids": set(),  # chunks the user expanded inline
         "result": None,         # EnhancementResult | None
-        "accepted_ids": set(),  # post-rewrite accept toggles
+        "accepted_ids": set(),  # rewrites the user is applying (default: all)
+        "dropped_count": 0,     # rewrites filtered out for non-positive delta
     }
     for k, v in defaults.items():
         if k not in st.session_state:

@@ -13,10 +13,12 @@ Each pane uses st.container(height=...) so the LIST scrolls independently;
 the pane title sits outside the scroll container and stays put.
 """
 
+import numpy as np
 import streamlit as st
 
 from src.generation.gemini_client import enhance_chunks
 from src.generation.schemas import ChunkRewrite, EnhancementResult
+from src.retrieval.embedding_retriever import load_minilm
 from src.ui import state
 
 
@@ -108,6 +110,41 @@ def _trigger_enhancement() -> None:
     st.session_state.enhancement_pending = True
 
 
+def _drop_non_improvements(result: EnhancementResult) -> tuple[EnhancementResult, int]:
+    """Filter out rewrites whose dense cosine vs. job ad didn't improve.
+
+    Returns (filtered_result, dropped_count). The same scoring is shown on
+    the results screen, so this guarantees every rewrite the user sees has
+    a strictly positive delta.
+    """
+    if not result.rewrites:
+        return result, 0
+
+    model = load_minilm()
+    job_ad = st.session_state.filtered_ad
+    job_emb = model.encode([job_ad], convert_to_numpy=True, normalize_embeddings=True)
+    job_emb = np.asarray(job_emb, dtype=np.float32).reshape(-1)
+    norm = np.linalg.norm(job_emb)
+    if norm > 0:
+        job_emb = job_emb / norm
+
+    dense_scores = st.session_state.dense_scores
+    kept: list[ChunkRewrite] = []
+    for rw in result.rewrites:
+        new_emb = model.encode(
+            [rw.rewritten_text], convert_to_numpy=True, normalize_embeddings=True
+        )
+        new_emb = np.asarray(new_emb, dtype=np.float32).reshape(-1)
+        new_score = float(np.clip(new_emb @ job_emb, 0.0, 1.0))
+        old_score = dense_scores.get(rw.chunk_id, 0.0)
+        delta = round(new_score * 100) - round(old_score * 100)
+        if delta > 0:
+            kept.append(rw)
+
+    dropped = len(result.rewrites) - len(kept)
+    return EnhancementResult(rewrites=kept), dropped
+
+
 def _run_enhancement() -> None:
     chunks = st.session_state.chunks
     selected = sorted(st.session_state.selected_ids)
@@ -133,8 +170,9 @@ def _run_enhancement() -> None:
                 st.error(f"Gemini call failed: {exc}")
             return
 
+    result, dropped = _drop_non_improvements(result)
     st.session_state.result = result
-    st.session_state.accepted_ids = {r.chunk_id for r in result.rewrites}
+    st.session_state.dropped_count = dropped
     st.session_state.enhancement_pending = False
     state.goto("results")
 
