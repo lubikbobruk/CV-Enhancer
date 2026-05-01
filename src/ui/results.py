@@ -1,9 +1,8 @@
 """Results screen: per-chunk rewrites (left), aggregate delta and PDF (right)."""
 
-import base64
-
 import numpy as np
 import streamlit as st
+from streamlit_pdf_viewer import pdf_viewer
 
 from src.output.pdf_writer import build_pdf
 from src.retrieval.embedding_retriever import load_minilm
@@ -215,13 +214,7 @@ def _render_right_pane() -> None:
         )
 
     pdf_bytes = st.session_state._cached_pdf
-    b64 = base64.b64encode(pdf_bytes).decode("ascii")
-    st.markdown(
-        f'<iframe src="data:application/pdf;base64,{b64}" '
-        'width="100%" height="500" style="border: 1px solid #ddd; border-radius: 8px;">'
-        "</iframe>",
-        unsafe_allow_html=True,
-    )
+    pdf_viewer(pdf_bytes, width="100%", height=500)
     st.download_button(
         "Download PDF",
         data=pdf_bytes,
