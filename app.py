@@ -2,6 +2,7 @@
 
 import streamlit as st
 from src.parsing import *
+from src.parsing.job_ad_filter import filter_role_relevant
 from src.retrieval.embedding_retriever import DenseRetriever, load_minilm
 from src.retrieval.fusion import reciprocal_rank_fusion
 from src.retrieval.tfidf_retriever import TfidfRetriever
@@ -39,7 +40,7 @@ if st.button("Enhance"):
                     If it's a scanned PDF, try a text-based version.")
         st.stop()
 
-    chunks = chunk(text)
+    chunks = chunk_cv(text)
     st.info(f"Parsed {len(chunks)} chunks from the CV.")
     with st.expander("Preview chunks"):
         for i, block in enumerate(chunks):
@@ -50,14 +51,20 @@ if st.button("Enhance"):
         st.info("Paste a job ad to see ranked chunks.")
         st.stop()
 
+    with st.spinner("Encoding chunks with MiniLM..."):
+        model = load_minilm()
+
+    filtered_ad = filter_role_relevant(job_ad, model=model)
+    with st.expander("Filtered job ad"):
+        st.text(filtered_ad)
+
     tfidf = TfidfRetriever()
     tfidf.fit(chunks)
-    tfidf_ranking = tfidf.query(job_ad, k=5)
+    tfidf_ranking = tfidf.query(filtered_ad, k=5)
 
-    with st.spinner("Encoding chunks with MiniLM..."):
-        dense = DenseRetriever(load_minilm())
-        dense.fit(chunks)
-    dense_ranking = dense.query(job_ad, k=5)
+    dense = DenseRetriever(model)
+    dense.fit(chunks)
+    dense_ranking = dense.query(filtered_ad, k=5)
 
     fused_ranking = reciprocal_rank_fusion([tfidf_ranking, dense_ranking], k=5)
 

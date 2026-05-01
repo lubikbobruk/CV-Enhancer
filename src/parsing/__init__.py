@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from src.parsing import docx_parser, pdf_parser
-from src.parsing.chunker import chunk
+from src.parsing.chunker import chunk, chunk_cv
 
 # Local branch
 _PARSERS = {
@@ -18,4 +18,4 @@ def extract_text(stream, filename) -> str:
     return _PARSERS[suffix](stream)
 
 # What to import on from src.parsing import *
-__all__ = ["extract_text", "chunk"]
+__all__ = ["extract_text", "chunk", "chunk_cv"]
