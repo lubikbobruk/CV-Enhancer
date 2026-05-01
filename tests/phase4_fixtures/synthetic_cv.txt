@@ -1,0 +1,20 @@
+Jane Doe
+Software Engineer
+
+Summary
+Backend engineer with five years of experience building Python web services
+and data pipelines. Comfortable owning a feature end-to-end.
+
+Acme Corp - Senior Backend Engineer
+06/2022 - Present
+Built and maintained internal data pipelines moving billions of rows per day.
+Wrote Python services backed by PostgreSQL. Mentored two junior engineers.
+Reduced batch job runtime by 40 percent by rewriting the scheduling layer.
+
+Beta Labs - Backend Engineer
+01/2020 - 05/2022
+Worked on a Django monolith serving customer dashboards. Added unit tests
+and refactored the billing module. Took part in on-call rotation.
+
+Hobbies
+Long-distance running, reading nineteenth-century novels, baking sourdough.

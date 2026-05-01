@@ -1,0 +1,14 @@
+Senior Data Engineer
+
+We are hiring a Senior Data Engineer to own our ETL platform. You will design
+and operate large-scale Airflow pipelines, work with dbt and Snowflake, and
+collaborate with analytics teams on data modeling.
+
+Requirements:
+- 5+ years building production ETL pipelines in Python
+- Strong SQL skills, ideally on a cloud data warehouse (Snowflake, BigQuery)
+- Experience with Airflow or a comparable orchestrator
+- Comfort mentoring engineers and reviewing pipeline designs
+
+Benefits: 25 vacation days, cafeteria allowance, sports activities.
+Apply now: jobs@example.com
