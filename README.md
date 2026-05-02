@@ -1,10 +1,10 @@
 # 📄 CV Enhancer
 
-![CV Enhancer demo](preview.gif)
-
 Rewrite a candidate's CV to better match a target job advertisement. Combines classical and dense information retrieval with a constrained LLM rewrite, end-to-end from a PDF/DOCX upload to a styled PDF download.
 
 **Live demo:** [cv-enhancer.streamlit.app](https://cv-enhancer.streamlit.app/)
+
+![CV Enhancer demo](preview.gif)
 
 ## 🚀 Project Overview
 
