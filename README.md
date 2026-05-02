@@ -1,5 +1,7 @@
 # 📄 CV Enhancer
 
+![CV Enhancer demo](preview.gif)
+
 A Python application that rewrites a candidate's CV to better match a target job advertisement. It combines classical and dense information retrieval with LLM support to produce an enhanced CV tailored to the role, along with structured feedback explaining what was changed and why.
 
 ## 🚀 Project Overview
