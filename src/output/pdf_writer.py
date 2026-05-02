@@ -1,7 +1,5 @@
 """Render CV chunks to a PDF byte stream via reportlab."""
 
-from __future__ import annotations
-
 import os
 import re
 from io import BytesIO
@@ -50,35 +48,14 @@ _CONTACT_LINE_RE = re.compile(
 )
 
 
-# (regular, bold) — first set whose regular file exists wins.
-_FONT_CANDIDATES: tuple[tuple[str, str], ...] = (
-    (r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\segoeuib.ttf"),
-    (r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\arialbd.ttf"),
-    (
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-    ),
-    (
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    ),
-)
-
-
 def _register_fonts() -> None:
-    """Register a wide-Unicode TTF family. Falls back to Bitstream Vera so Polish/Czech glyphs render."""
+    """Register reportlab's bundled Vera family — identical output across OSes."""
     global _FONTS_REGISTERED
     if _FONTS_REGISTERED:
         return
-
-    chosen = next((p for p in _FONT_CANDIDATES if os.path.isfile(p[0])), None)
-    if chosen is None:
-        fonts_dir = os.path.join(os.path.dirname(reportlab.__file__), "fonts")
-        chosen = (os.path.join(fonts_dir, "Vera.ttf"), os.path.join(fonts_dir, "VeraBd.ttf"))
-
-    regular, bold = chosen
-    pdfmetrics.registerFont(TTFont(_FONT_BODY, regular))
-    pdfmetrics.registerFont(TTFont(_FONT_BOLD, bold if os.path.isfile(bold) else regular))
+    fonts_dir = os.path.join(os.path.dirname(reportlab.__file__), "fonts")
+    pdfmetrics.registerFont(TTFont(_FONT_BODY, os.path.join(fonts_dir, "Vera.ttf")))
+    pdfmetrics.registerFont(TTFont(_FONT_BOLD, os.path.join(fonts_dir, "VeraBd.ttf")))
     _FONTS_REGISTERED = True
 
 

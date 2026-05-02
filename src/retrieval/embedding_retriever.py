@@ -56,7 +56,7 @@ class DenseRetriever(Retriever):
     if norm > 0.0:
       q = q / norm
 
-    # Cosine = dot product after L2 normalization)
+    # Cosine = dot product after L2 normalization
     scores = self._matrix @ q
 
     k = min(k, self._corpus_size)
